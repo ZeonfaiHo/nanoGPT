@@ -91,6 +91,39 @@ class MLP(nn.Module):
         x = self.dropout(x)
         return x
 
+class LoReGLU(nn.Module):
+
+    def __init__(self, config):
+        super().__init__()
+        self.gate_weight_rank = int(0.22 * config.n_embd)
+        self.intermediate_states_size = int(3.5 * config.n_embd)
+
+        self.up_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj_0 = nn.Linear(config.n_embd, self.gate_weight_rank, bias=False)
+        self.gate_proj_1 = nn.Linear(self.gate_weight_rank, self.intermediate_states_size, bias=config.bias)
+        self.act_fn = nn.ReLU()
+        self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+    def forward(self, x):
+        x = self.up_proj(x) * self.act_fn(self.gate_proj_1(self.gate_proj_0(x)))
+        x = self.down_proj(x)
+        return x
+    
+class ReGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size = int(8 / 3 * config.n_embd)
+
+        self.up_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.act_fn    = nn.ReLU()
+        self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+    def forward(self, x):
+        x = self.up_proj(x) * self.act_fn(self.gate_proj(x))
+        x = self.down_proj(x)
+        return x
+
 class Block(nn.Module):
 
     def __init__(self, config):
@@ -98,7 +131,9 @@ class Block(nn.Module):
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
-        self.mlp = MLP(config)
+        # self.mlp = MLP(config)
+        # self.mlp = LoReGLU(config)
+        self.mlp = ReGLU(config)
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
