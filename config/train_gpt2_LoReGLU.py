@@ -1,3 +1,4 @@
+init_from = 'resume'
 out_dir = 'out-gpt2-LoReGLU'
 
 wandb_log = False
