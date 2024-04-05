@@ -260,8 +260,11 @@ while True:
         param_group['lr'] = lr
 
     # evaluate the loss on train/val sets and write checkpoints
-    if iter_num % eval_interval == 0 and master_process:
+    if (iter_num % eval_interval == 0 or eval_only) and master_process:
         losses = estimate_loss()
+        # for layer in model.transformer.h:
+        #     percentage = (layer.mlp.intermediate_states == 0).float().sum().item() / layer.mlp.intermediate_states.numel()
+        #     print(percentage)
         print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
         if wandb_log:
             wandb.log({
@@ -271,7 +274,7 @@ while True:
                 "lr": lr,
                 "mfu": running_mfu*100, # convert to percentage
             })
-        if losses['val'] < best_val_loss or always_save_checkpoint:
+        if not eval_only and (losses['val'] < best_val_loss or always_save_checkpoint):
             best_val_loss = losses['val']
             if iter_num > 0:
                 checkpoint = {
@@ -284,7 +287,8 @@ while True:
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
-    if iter_num == 0 and eval_only:
+    # if iter_num == 0 and eval_only:
+    if eval_only:
         break
 
     # forward backward update, with optional gradient accumulation to simulate larger batch size

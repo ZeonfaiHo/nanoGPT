@@ -104,8 +104,11 @@ class LoReGLU(nn.Module):
         self.act_fn = nn.ReLU()
         self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
         self.dropout = nn.Dropout(config.dropout)
+
+        # self.intermediate_states = None
     def forward(self, x):
         x = self.up_proj(x) * self.act_fn(self.gate_proj_1(self.gate_proj_0(x)))
+        # self.intermediate_states = x.detach()
         x = self.down_proj(x)
         return x
     
@@ -132,8 +135,8 @@ class Block(nn.Module):
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
         # self.mlp = MLP(config)
-        # self.mlp = LoReGLU(config)
-        self.mlp = ReGLU(config)
+        self.mlp = LoReGLU(config)
+        # self.mlp = ReGLU(config)
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))

@@ -1,0 +1,70 @@
+Overriding config with ./config/train_gpt2_LoReGLU.py:
+out_dir = 'out-gpt2-LoReGLU'
+
+wandb_log = False
+
+always_save_checkpoint = False
+
+# these make the total batch size be ~0.5M
+# 12 batch size * 1024 block size * 5 gradaccum * 8 GPUs = 491,520
+batch_size = 12
+block_size = 1024
+gradient_accumulation_steps = 5 * 8
+
+
+# this makes total number of tokens be 300B
+max_iters = 600000
+lr_decay_iters = 600000
+
+# eval stuff
+eval_interval = 1000
+eval_iters = 200
+log_interval = 10
+
+# weight decay
+weight_decay = 1e-1
+
+tokens per iteration will be: 491,520
+Initializing a new model from scratch
+defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)
+number of parameters: 123.48M
+num decayed parameter tensors: 74, with 124,243,968 parameters
+num non-decayed parameter tensors: 25, with 19,200 parameters
+using fused AdamW: True
+compiling the model... (takes a ~minute)
+step 0: train loss 10.9781, val loss 10.9776
+iter 0: loss 10.9854, time 55405.55ms, mfu -100.00%
+iter 10: loss 10.7213, time 4871.20ms, mfu 27.62%
+iter 20: loss 10.1260, time 4873.40ms, mfu 27.62%
+iter 30: loss 9.6545, time 4869.03ms, mfu 27.62%
+iter 40: loss 9.4381, time 4869.85ms, mfu 27.62%
+iter 50: loss 9.2081, time 4868.26ms, mfu 27.62%
+iter 60: loss 8.9436, time 4869.67ms, mfu 27.63%
+iter 70: loss 8.8560, time 4872.28ms, mfu 27.62%
+iter 80: loss 8.6032, time 4872.72ms, mfu 27.62%
+iter 90: loss 8.2376, time 4870.45ms, mfu 27.62%
+iter 100: loss 8.1365, time 4871.00ms, mfu 27.62%
+iter 110: loss 7.8501, time 4871.98ms, mfu 27.62%
+iter 120: loss 7.8927, time 4871.99ms, mfu 27.62%
+iter 130: loss 7.6179, time 4874.64ms, mfu 27.62%
+iter 140: loss 7.6502, time 4875.16ms, mfu 27.62%
+iter 150: loss 7.1656, time 4876.09ms, mfu 27.62%
+iter 160: loss 6.9783, time 4876.29ms, mfu 27.61%
+iter 170: loss 7.0041, time 4878.12ms, mfu 27.61%
+iter 180: loss 7.0686, time 4878.33ms, mfu 27.61%
+iter 190: loss 6.9235, time 4879.62ms, mfu 27.60%
+iter 200: loss 6.8579, time 4881.17ms, mfu 27.60%
+iter 210: loss 6.6513, time 4885.03ms, mfu 27.60%
+iter 220: loss 6.6308, time 4882.62ms, mfu 27.59%
+iter 230: loss 6.4076, time 4882.89ms, mfu 27.59%
+iter 240: loss 6.3227, time 4886.27ms, mfu 27.58%
+iter 250: loss 6.6885, time 4884.37ms, mfu 27.58%
+iter 260: loss 6.3666, time 4887.21ms, mfu 27.57%
+iter 270: loss 6.5034, time 4886.46ms, mfu 27.57%
+iter 280: loss 6.3083, time 4886.46ms, mfu 27.57%
+iter 290: loss 6.1879, time 4886.97ms, mfu 27.56%
+iter 300: loss 6.3422, time 4886.20ms, mfu 27.56%
+iter 310: loss 6.3140, time 4889.12ms, mfu 27.56%
+iter 320: loss 6.0890, time 4888.14ms, mfu 27.55%
+iter 330: loss 6.1958, time 4888.21ms, mfu 27.55%
+iter 340: loss 6.0670, time 4887.47ms, mfu 27.55%
