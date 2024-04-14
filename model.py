@@ -148,7 +148,7 @@ class BlockReGLU(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.intermediate_states_size =  config.n_embd * 4
-        self.block_size = 64
+        self.block_size = 16
 
         assert self.intermediate_states_size % self.block_size == 0
 
@@ -344,7 +344,7 @@ class GPT(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
     
     def auxilary_loss(self, aux_lambda=1e-1):
-        # return 0
+        return torch.tensor(0.0)
     
         aux_loss = 0
         for layer in self.transformer.h:
