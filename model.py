@@ -105,11 +105,12 @@ class LoReGLU(nn.Module):
         self.act_fn = nn.ReLU()
         self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
         self.dropout = nn.Dropout(config.dropout)
-
-        # self.intermediate_states = None
+        self.intermediate_states = None
+        self.save_intermediate_states = False
     def forward(self, x):
         x = self.up_proj(x) * self.act_fn(self.gate_proj_1(self.gate_proj_0(x)))
-        # self.intermediate_states = x.detach()
+        if self.save_intermediate_states:
+            self.intermediate_states = x.detach()
         x = self.down_proj(x)
         return x
     
@@ -120,11 +121,142 @@ class ReGLU(nn.Module):
 
         self.up_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
         self.gate_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
-        self.act_fn    = nn.ReLU()
-        self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.act_fn = nn.ReLU()
+        self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
         self.dropout = nn.Dropout(config.dropout)
     def forward(self, x):
         x = self.up_proj(x) * self.act_fn(self.gate_proj(x))
+        x = self.down_proj(x)
+        return x
+        
+class SwiGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size = int(8 / 3 * config.n_embd)
+
+        self.up_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.act_fn = nn.SiLU()
+        self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+    def forward(self, x):
+        x = self.up_proj(x) * self.act_fn(self.gate_proj(x))
+        x = self.down_proj(x)
+        return x
+
+class BlockReGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size =  config.n_embd * 4
+        self.block_size = 64
+
+        assert self.intermediate_states_size % self.block_size == 0
+
+        self.up_proj = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj = nn.Linear(config.n_embd , self.intermediate_states_size // self.block_size, bias=config.bias)
+        self.act_fn    = nn.ReLU()
+        self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+        self.intermediate_states = None
+        self.save_intermediate_states = True
+    def forward(self, x):
+        intermediate_states = self.act_fn(self.gate_proj(x))
+        if self.save_intermediate_states:
+            self.intermediate_states = intermediate_states.detach()
+        x = self.up_proj(x) * torch.repeat_interleave(intermediate_states, self.block_size, dim=-1)
+        x = self.down_proj(x)
+        return x
+
+class BlockBiLinReGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size =  int(config.n_embd * 8 // 3)
+        self.block_size = 64
+
+        assert self.intermediate_states_size % self.block_size == 0
+
+        self.up_proj_0 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.up_proj_1 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj = nn.Linear(config.n_embd , self.intermediate_states_size // self.block_size, bias=config.bias)
+        self.act_fn    = nn.ReLU()
+        self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+        self.intermediate_states = None
+        self.save_intermediate_states = True
+    def forward(self, x):
+        intermediate_states = self.act_fn(self.gate_proj(x))
+        if self.save_intermediate_states:
+            self.intermediate_states = intermediate_states
+        x = self.up_proj_0(x) * self.up_proj_1(x) * torch.repeat_interleave(intermediate_states, self.block_size, dim=-1)
+        x = self.down_proj(x)
+        return x
+
+# class BlockBiLinReGLU(nn.Module):
+#     def __init__(self, config):
+#         super().__init__()
+#         self.intermediate_states_size =  int(config.n_embd * 3.5)
+#         self.gate_weight_rank = int(0.22 * config.n_embd)
+#         self.block_size = 64
+
+#         assert self.intermediate_states_size % self.block_size == 0
+
+#         self.up_proj_0 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+#         self.up_proj_1_0 = nn.Linear(config.n_embd, self.gate_weight_rank, bias=False)
+#         self.up_proj_1_1 = nn.Linear(self.gate_weight_rank, self.intermediate_states_size, bias=config.bias)
+#         self.gate_proj = nn.Linear(config.n_embd , self.intermediate_states_size // self.block_size, bias=config.bias)
+#         self.act_fn    = nn.ReLU()
+#         self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+#         self.dropout = nn.Dropout(config.dropout)
+#         self.intermediate_states = None
+#         self.save_intermediate_states = True
+#     def forward(self, x):
+#         intermediate_states = self.act_fn(self.gate_proj(x))
+#         if self.save_intermediate_states:
+#             self.intermediate_states = intermediate_states
+#         x = self.up_proj_0(x) * self.up_proj_1_1(self.up_proj_1_0(x)) * torch.repeat_interleave(intermediate_states, self.block_size, dim=-1)
+#         x = self.down_proj(x)
+#         return x
+    
+class BiLinLoReGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size =  config.n_embd * 8 // 3
+        self.gate_weight_rank = int(0.22 * config.n_embd)
+        self.block_size = 64
+
+        assert self.intermediate_states_size % self.block_size == 0
+
+        self.up_proj_0 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.up_proj_1 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.gate_proj_0 = nn.Linear(config.n_embd, self.gate_weight_rank, False)
+        self.gate_proj_1 = nn.Linear(self.gate_weight_rank, self.intermediate_states_size, bias=config.bias)
+        self.act_fn = nn.ReLU()
+        self.down_proj = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+        self.intermediate_states = None
+        self.save_intermediate_states = True
+    def forward(self, x):
+        intermediate_states = self.act_fn(self.gate_proj_1(self.gate_proj_0(x)))
+        if self.save_intermediate_states:
+            self.intermediate_states = intermediate_states
+        x = self.up_proj_0(x) * self.up_proj_1(x) * intermediate_states
+        x = self.down_proj(x)
+        return x
+
+class BiLinGLU(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.intermediate_states_size =  config.n_embd * 8 // 3
+
+        self.up_proj_0 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.up_proj_1 = nn.Linear(config.n_embd, self.intermediate_states_size, bias=config.bias)
+        self.act_fn    = nn.ReLU()
+        self.down_proj  = nn.Linear(self.intermediate_states_size, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+        self.intermediate_states = None
+        self.save_intermediate_states = False
+    def forward(self, x):
+        x = self.up_proj_0(x) * self.up_proj_1(x)
         x = self.down_proj(x)
         return x
 
@@ -136,8 +268,13 @@ class Block(nn.Module):
         self.attn = CausalSelfAttention(config)
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
         # self.mlp = MLP(config)
-        self.mlp = LoReGLU(config)
+        # self.mlp = LoReGLU(config)
         # self.mlp = ReGLU(config)
+        # self.mlp = SwiGLU(config)
+        # self.mlp = BlockReGLU(config)
+        self.mlp = BlockBiLinReGLU(config)
+        # self.mlp = BiLinGLU(config)
+        # self.mlp = BiLinLoReGLU(config)
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
@@ -205,6 +342,16 @@ class GPT(nn.Module):
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+    
+    def auxilary_loss(self, aux_lambda=1e-1):
+        # return 0
+    
+        aux_loss = 0
+        for layer in self.transformer.h:
+            percentage = torch.eq(layer.mlp.intermediate_states, 0).sum() / layer.mlp.intermediate_states.numel()
+            aux_loss += layer.mlp.intermediate_states.abs().mean() * (1 - percentage)
+        
+        return aux_loss * aux_lambda
 
     def forward(self, idx, targets=None):
         device = idx.device
@@ -224,12 +371,14 @@ class GPT(nn.Module):
             # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            aux_loss = self.auxilary_loss()
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
             logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
             loss = None
+            aux_loss = None
 
-        return logits, loss
+        return logits, loss, aux_loss
 
     def crop_block_size(self, block_size):
         # model surgery to decrease the block size if necessary
