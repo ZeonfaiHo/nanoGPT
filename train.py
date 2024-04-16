@@ -54,6 +54,9 @@ n_head = 12
 n_embd = 768
 dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
 bias = False # do we use bias inside LayerNorm and Linear layers?
+ffn_type = 'GELU'
+lambda_aux = 0.0
+save_intermediate_states = False
 # adamw optimizer
 learning_rate = 6e-4 # max learning rate
 max_iters = 600000 # total number of training iterations
@@ -144,9 +147,13 @@ if os.path.exists(meta_path):
     meta_vocab_size = meta['vocab_size']
     print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
 
+if lambda_aux != 0.0:
+    assert save_intermediate_states
+
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
-                  bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
+                  bias=bias, vocab_size=None, dropout=dropout, ffn_type=ffn_type, lambda_aux = lambda_aux, save_intermediate_states=save_intermediate_states) # start with model_args from command line
+
 if init_from == 'scratch':
     # init a new model from scratch
     print("Initializing a new model from scratch")
@@ -268,9 +275,10 @@ while True:
     # evaluate the loss on train/val sets and write checkpoints
     if (iter_num % eval_interval == 0 or eval_only) and master_process:
         losses = estimate_loss()
-        for layer in model.transformer.h:
-            percentage = torch.eq(layer.mlp.intermediate_states, 0).sum().item() / layer.mlp.intermediate_states.numel()
-            print(percentage)
+        if not ddp:
+            for layer in model.transformer.h:
+                percentage = torch.eq(layer.mlp.intermediate_states, 0).sum().item() / layer.mlp.intermediate_states.numel()
+                print(percentage)
         print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
         if wandb_log:
             wandb.log({

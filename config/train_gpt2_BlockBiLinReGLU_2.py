@@ -1,5 +1,5 @@
-init_from = 'resume'
-out_dir = 'out-gpt2-BlockBiLinReGLU'
+# init_from = 'resume'
+out_dir = 'out-gpt2-BlockBiLinReGLU-2'
 
 wandb_log = False
 
